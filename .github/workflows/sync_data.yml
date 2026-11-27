@@ -1,33 +1,39 @@
-name: 🔄 v9 数据同步(从 v8)
+name: 🔄 v9 数据同步 + 发布
 
-# 九宝量化 v9 · 数据同步
+# 九宝量化 v9 · 数据同步 + Pages 发布（一次运行做完，不依赖二次触发）
 #   宗旨：① 大盘走势判断  ② 未来收益率最高的股
-#   v9 只展示、不生产：数据从 v8 的 GitHub Pages 拉取（6 个 data/*.js，约 102KB）。
+#   v9 只展示、不生产：数据从 v8 的 GitHub Pages 拉取（6 个 data/*.js，约 100KB）。
 #   v8 冻结不再改代码，但其数据链继续跑；v9 借此保持独立展示。
 #   观测类数据（涨停热力/板块资金/板块强度/龙虎榜/ETF…）不进 v9，留在 v8。
 #
-# 铁律：拉取失败/文件过小/不含 window. ⇒ 保留旧文件，绝不写入空文件（防空结果固化）。
+# 铁律（v8 血证）：用 GITHUB_TOKEN 提交的 push 不会触发下游 push workflow ⇒ Pages 恒旧。
+#   故本 workflow 同步完就地部署，发布不依赖 deploy.yml 被再次触发。
 
 on:
   schedule:
-    # 北京时间 = UTC+8。盘前 08:40 / 盘中 11:35 / 盘后 16:40 / 夜间 20:40
-    - cron: '40 0 * * 1-5'
-    - cron: '35 3 * * 1-5'
-    - cron: '40 8 * * 1-5'
-    - cron: '40 12 * * 1-5'
+    # 北京时间 = UTC+8。盘前 08:50 / 盘中 11:40 / 盘后 16:45 / 夜间 20:45
+    - cron: '50 0 * * 1-5'
+    - cron: '40 3 * * 1-5'
+    - cron: '45 8 * * 1-5'
+    - cron: '45 12 * * 1-5'
   workflow_dispatch:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
-  group: v9-sync-data
+  group: v9-pages
   cancel-in-progress: false
 
 jobs:
-  sync:
+  sync-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -53,17 +59,32 @@ jobs:
             fi
           done
           echo "── 成功 $OK / 失败 $FAIL ──"
-          if [ "$OK" -eq 0 ]; then echo "🔴 全部失败，中止（不产生空提交）"; exit 1; fi
+          if [ "$OK" -eq 0 ]; then echo "🔴 全部失败，中止（不产生空提交、不发布）"; exit 1; fi
 
       - name: 统计并提交
         run: |
           set -e
           NEW=$(git status --porcelain data/ | wc -l | tr -d ' ')
           echo "变更文件数：$NEW"
-          ls -la data/ | head -20
-          if [ "$NEW" -eq 0 ]; then echo "⏭️ 无变更"; exit 0; fi
+          ls -la data/
+          if [ "$NEW" -eq 0 ]; then echo "⏭️ 数据无变更（仍重新发布一次，防止 Pages 落后于代码）"; exit 0; fi
           git config user.name  "v9-sync-bot"
           git config user.email "v9-sync-bot@users.noreply.github.com"
           git add data/
-          git commit -m "chore(data): v9 同步 v8 数据 $(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M')"
+          git commit -m "chore(data): v9 同步 v8 数据 $(date -u -d '+8 hours' '+%Y-%m-%d %H:%M') 北京时间"
           git push
+
+      - name: 发布前守卫
+        run: |
+          set -e
+          test -f index.html || { echo "🔴 缺 index.html"; exit 1; }
+          N=$(ls data/*.js 2>/dev/null | wc -l | tr -d ' ')
+          echo "data/*.js = $N ；index.html = $(wc -c < index.html) B"
+          test "$N" -ge 5 || { echo "🔴 data 文件仅 $N 个（<5），疑同步残缺，拒绝发布"; exit 1; }
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      - id: deployment
+        uses: actions/deploy-pages@v4
