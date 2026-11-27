@@ -1,0 +1,7 @@
+﻿2026-11-27T01:52:17.8648839Z ##[group]Run echo "✅ 🏦 v8 国债期货利率罗盘 refresh (cn) 完成"
+2026-11-27T01:52:17.8649310Z [36;1mecho "✅ 🏦 v8 国债期货利率罗盘 refresh (cn) 完成"[0m
+2026-11-27T01:52:17.8677477Z shell: E:\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-11-27T01:52:17.8677867Z env:
+2026-11-27T01:52:17.8678087Z   PYTHONUTF8: 1
+2026-11-27T01:52:17.8678316Z ##[endgroup]
+2026-11-27T01:52:17.9230408Z ✅ 🏦 v8 国债期货利率罗盘 refresh (cn) 完成

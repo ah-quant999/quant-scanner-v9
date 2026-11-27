@@ -90,6 +90,25 @@ tbody tr:hover{background:var(--panel2)}
 .pill.warn{background:rgba(255,208,36,.14);color:var(--gold);border:1px solid rgba(255,208,36,.32)}
 .pill.mute{background:rgba(148,163,184,.12);color:var(--sub);border:1px solid rgba(148,163,184,.28)}
 
+/* ── 运维监控（2026-11-27 主人令：v9 也要有运维，和 v8 一样） ── */
+.lt{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:6px}
+.lt.ok{background:var(--down)}.lt.warn{background:var(--gold)}.lt.mute{background:var(--dim)}.lt.bad{background:var(--up)}
+.legend{font-size:11.5px;color:var(--dim);line-height:2;padding:9px 11px;margin-top:12px;
+  background:var(--panel2);border-radius:8px}
+.legend .lt{margin:0 4px 0 10px}
+.legend .lt:first-child{margin-left:0}
+.oprow{display:flex;align-items:baseline;gap:9px;font-size:12.5px;padding:6px 0;border-bottom:1px dashed rgba(36,48,64,.55);flex-wrap:wrap}
+.oprow:last-child{border-bottom:none}
+.oprow .on{flex:0 0 96px;font-weight:600}
+.oprow .ot{font-variant-numeric:tabular-nums;color:var(--sub)}
+.oprow .od{margin-left:auto;font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+.runcard{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:7px 0;border-bottom:1px dashed rgba(36,48,64,.55)}
+.runcard:last-child{border-bottom:none}
+.runcard .rn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.runcard .rt{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums;text-align:right;flex:0 0 auto}
+.urlbox{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+  font-family:ui-monospace,Consolas,monospace;font-size:12.5px;word-break:break-all;user-select:all}
+
 
 .act{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
 .act .big{font-size:27px;font-weight:800;line-height:1.1;letter-spacing:.5px}
@@ -141,6 +160,7 @@ summary:hover{color:var(--txt)}
   <div class="tabs">
     <div class="tab active" data-sec="mkt">📊 大盘</div>
     <div class="tab" data-sec="pick">🎯 选股</div>
+    <div class="tab" data-sec="ops">🔧 运维</div>
   </div>
 </header>
 
@@ -198,6 +218,43 @@ summary:hover{color:var(--txt)}
 
   </div>
 </section>
+
+<!-- ═══════════ ③ 运维监控（仿 v8 运维面板：数据健康 / 任务运行 / 上游供数 / 部署入口） ═══════════ -->
+<section id="sec-ops">
+  <div class="grid">
+
+    <div class="card c12">
+      <div class="ch"><h3>数据健康总览</h3><span class="tag">灯色 = 真实新鲜度，不靠推断</span><span class="ts" id="ts-ops">—</span></div>
+      <div class="cb">
+        <div id="opsHealth"><div class="empty">体检中…</div></div>
+        <div class="legend">
+          <b style="color:var(--sub)">灯色图例</b>：
+          <i class="lt ok"></i>绿=当日数据到位 ·
+          <i class="lt mute"></i>灰=上一交易日 / 非交易周期（正常，无需处理）·
+          <i class="lt warn"></i>金=陈旧 ≥3 天（<b style="color:var(--gold)">需处理</b>）·
+          <i class="lt bad"></i>红=文件缺失或解析失败（<b style="color:var(--up)">真故障</b>）
+          <div style="margin-top:3px">💡 判断只看 <code>update_time</code> / <code>date</code> 字段，<b>不看文件修改时间</b>（同步会刷新 mtime 造成假新鲜）。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card c7">
+      <div class="ch"><h3>任务运行看板</h3><span class="tag">v9 自身：同步 + 发布</span><span class="ts" id="ts-run">—</span></div>
+      <div class="cb" id="opsRuns"><div class="empty">读取运行记录…</div></div>
+    </div>
+
+    <div class="card c5">
+      <div class="ch"><h3>上游供数</h3><span class="tag">v9 不生产数据</span></div>
+      <div class="cb" id="opsUp"><div class="empty">—</div></div>
+    </div>
+
+    <div class="card c12">
+      <div class="ch"><h3>部署与入口</h3><span class="tag">固定网址 · 仓库 · 运行日志</span></div>
+      <div class="cb" id="opsMeta"><div class="empty">—</div></div>
+    </div>
+
+  </div>
+</section>
 </main>
 
 <!-- ═══════════ 数据注入（defer，同步 workflow 维护） ═══════════ -->
@@ -250,6 +307,8 @@ function switchTo(sec){
   document.querySelectorAll('main section').forEach(function(s){ s.classList.toggle('active', s.id==='sec-'+sec); });
   try{ localStorage.setItem('v9_sec', sec); }catch(e){}
   window.scrollTo(0,0);
+  /* 运维页懒加载：只在真正点进来时才打 GitHub API，省限流额度 */
+  if(sec === 'ops'){ try{ loadRuns(); }catch(e){} }
 }
 tabs.forEach(function(t){ t.addEventListener('click', function(){ switchTo(t.dataset.sec); }); });
 
@@ -498,11 +557,159 @@ function renderDisc(){
   box.innerHTML = h;
 }
 
+/* ══════════════ ③ 运维监控 ══════════════
+   2026-11-27 主人令「v9 也要有个运维监控，和 v8 一样」。
+   口径照 v8 运维面板：新鲜度只看数据自带的 update_time / date 字段，
+   绝不用文件 mtime（同步会刷 mtime ⇒ 假新鲜）。
+   运行记录走公开 GitHub API（未认证限流 60 次/时）⇒ localStorage 缓存 30 分钟。
+   ══════════════════════════════════════════════════════════════ */
+var OPS_REPO = 'ah-quant999/quant-scanner-v9';
+var OPS_SITE = 'https://ah-quant999.github.io/quant-scanner-v9/';
+
+var OPS_SRC = [
+  { n:'指数快览', g:'INDEX_QUOTES',          k:'update_time', use:'① 大盘位置' },
+  { n:'大盘资金', g:'MARKET_FUND_FLOW_DATA', k:'update_time', use:'① 主力净额' },
+  { n:'平均股价', g:'AVG_PRICE_DATA',        k:'date',        use:'① 全市场位置' },
+  { n:'综合研判', g:'V8_VERDICT',            k:'update_time', use:'② 买不买·买哪只' }
+];
+var LIGHT_TXT = { ok:'正常', mute:'T-1 / 非周期', warn:'陈旧', bad:'缺失' };
+
+function opsLight(hasData, d){
+  if(!hasData) return 'bad';
+  if(d == null) return 'mute';
+  if(d >= 3) return 'warn';
+  if(d >= 2) return 'mute';
+  return 'ok';
+}
+
+/* 固定北京时间（不受访客时区影响） */
+function bj(iso){
+  if(!iso) return '—';
+  var d = new Date(iso);
+  if(isNaN(d.getTime())) return '—';
+  var t = new Date(d.getTime() + 8*36e5);
+  function p(x){ return (x<10?'0':'')+x; }
+  return t.getUTCFullYear()+'-'+p(t.getUTCMonth()+1)+'-'+p(t.getUTCDate())+' '+p(t.getUTCHours())+':'+p(t.getUTCMinutes());
+}
+function dur(a, b){
+  if(!a || !b) return '';
+  var s = Math.round((new Date(b) - new Date(a)) / 1000);
+  if(!isFinite(s) || s < 0) return '';
+  return s >= 60 ? (Math.floor(s/60) + '分' + (s%60) + '秒') : (s + '秒');
+}
+
+function renderOpsHealth(){
+  var box = $('opsHealth'); if(!box) return;
+  var h = '<table><thead><tr><th>数据</th><th>最新时间</th><th>陈旧</th><th>灯</th><th>服务</th></tr></thead><tbody>';
+  var bad = 0, warnN = 0, last = null;
+  OPS_SRC.forEach(function(s){
+    var D = window[s.g];
+    var has = !!(D && Object.keys(D).length);
+    var t = has ? D[s.k] : null;
+    var d = dayDiff(t);
+    var lt = opsLight(!!(has && t != null), d);
+    if(lt === 'bad') bad++;
+    if(lt === 'warn') warnN++;
+    if(t && (!last || String(t) > String(last))) last = t;
+    h += '<tr>'
+      +  '<td>' + esc(s.n) + '<div class="why2">window.' + s.g + '</div></td>'
+      +  '<td class="num" style="text-align:right">' + (t ? esc(ts(t)) : '<span class="dim">未到位</span>') + '</td>'
+      +  '<td class="num" style="text-align:right;color:' + (lt === 'warn' ? 'var(--gold)' : 'var(--dim)') + '">'
+      +    (d == null ? '—' : (d === 0 ? '当日' : d + ' 天')) + '</td>'
+      +  '<td style="text-align:right"><i class="lt ' + lt + '"></i><span style="font-size:11.5px;color:var(--dim)">' + LIGHT_TXT[lt] + '</span></td>'
+      +  '<td class="dim" style="text-align:right;font-size:11.5px">' + esc(s.use) + '</td>'
+      +  '</tr>';
+  });
+  h += '</tbody></table>';
+
+  var verdict;
+  if(bad) verdict = '<b style="color:var(--up)">' + bad + ' 个数据文件缺失</b> —— 对应卡片已显示「未到位」，绝不拿旧数据冒充。';
+  else if(warnN) verdict = '<b class="gold">' + warnN + ' 个数据陈旧 ≥3 天</b> —— 上游链可能断更，卡片上已标「陈旧 N 天」。';
+  else verdict = '<b style="color:var(--down)">全部在正常新鲜度内</b>（灰 = 上一交易日盘后数据，属正常）。';
+  h += '<div class="note" style="margin-top:10px">体检结论：' + verdict + '</div>';
+  box.innerHTML = h;
+  markTs($('ts-ops'), last);
+}
+
+function renderRuns(d){
+  var box = $('opsRuns'); if(!box) return;
+  var runs = (d && d.workflow_runs) || [];
+  if(!runs.length){ box.innerHTML = '<div class="empty">暂无运行记录</div>'; return; }
+  var ICON = { success:'✅', failure:'❌', cancelled:'⚪', skipped:'⏭' };
+  var h = '';
+  runs.slice(0, 8).forEach(function(r){
+    var ic = (r.conclusion == null) ? '🔄' : (ICON[r.conclusion] || '•');
+    h += '<div class="runcard">'
+      +  '<span>' + ic + '</span>'
+      +  '<span class="rn" title="' + esc(r.name) + '">' + esc(String(r.name || '')) + '</span>'
+      +  '<span class="rt">' + esc(bj(r.run_started_at || r.created_at)) + '<br>' + esc(dur(r.run_started_at, r.updated_at)) + '</span>'
+      +  '</div>';
+  });
+  h += '<div class="note" style="margin-top:9px">缓存 30 分钟 · 未认证 API 限流 60 次/时 · 完整日志见 '
+    +  '<a href="https://github.com/' + OPS_REPO + '/actions" target="_blank" rel="noopener">Actions</a></div>';
+  box.innerHTML = h;
+  if($('ts-run')) $('ts-run').textContent = bj(runs[0].updated_at);
+}
+
+function loadRuns(){
+  var box = $('opsRuns'); if(!box) return;
+  var TTL = 30*60*1000, cache = null;
+  try{ cache = JSON.parse(localStorage.getItem('v9_ops_runs') || 'null'); }catch(e){}
+  if(cache && cache.t && (Date.now() - cache.t) < TTL && cache.d){ renderRuns(cache.d); return; }
+  if(typeof fetch !== 'function'){ box.innerHTML = '<div class="empty">浏览器不支持 fetch</div>'; return; }
+  fetch('https://api.github.com/repos/' + OPS_REPO + '/actions/runs?per_page=10', { headers:{ 'Accept':'application/vnd.github+json' } })
+    .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(d){
+      try{ localStorage.setItem('v9_ops_runs', JSON.stringify({ t: Date.now(), d: d })); }catch(e){}
+      renderRuns(d);
+    })
+    .catch(function(e){
+      box.innerHTML = '<div class="empty">未取到运行状态（' + esc(e.message || '网络受限') + '）<br>'
+        + '直接打开 <a href="https://github.com/' + OPS_REPO + '/actions" target="_blank" rel="noopener">Actions 运行日志</a></div>';
+    });
+}
+
+function renderOpsUp(){
+  var box = $('opsUp'); if(!box) return;
+  var h = '<div class="note" style="margin-bottom:9px">v9 <b>只展示、不生产</b>：四个文件由 <code>sync_data.yml</code> 从 v8 Pages 拉取，与发布合并成同一次运行（否则 GITHUB_TOKEN 的 push 不触发下游部署 ⇒ Pages 恒旧）。</div>';
+  OPS_SRC.forEach(function(s){
+    var D = window[s.g] || {};
+    var t = D[s.k] || null;
+    h += '<div class="oprow"><span class="on">' + esc(s.n) + '</span>'
+      +  '<span class="ot">' + (t ? esc(ts(t)) : '<span class="dim">未到位</span>') + '</span>'
+      +  '<span class="od">v8 供数</span></div>';
+  });
+  h += '<div class="note" style="margin-top:10px">v8 已冻结（代码不再改），采集/算法链继续跑并为 v9 供数。<br>'
+    +  '上游主站：<a href="https://ah-quant999.github.io/quant-scanner-v8/" target="_blank" rel="noopener">quant-scanner-v8</a></div>';
+  box.innerHTML = h;
+}
+
+function renderOpsMeta(){
+  var box = $('opsMeta'); if(!box) return;
+  var n = document.querySelectorAll('script[src^="data/"]').length;
+  var h = '<div class="subhd">固定网址（收藏这一个就够）</div>'
+    + '<div class="urlbox">' + OPS_SITE + '</div>'
+    + '<div class="kv" style="margin-top:12px">'
+    +  '<div class="kvitem"><div class="k">数据文件</div><div class="v num">' + n + ' 个</div></div>'
+    +  '<div class="kvitem"><div class="k">页面版本</div><div class="v num" style="font-size:13px">' + esc(String(document.lastModified || '—').slice(0, 16)) + '</div></div>'
+    +  '<div class="kvitem"><div class="k">当前（北京时间）</div><div class="v num" style="font-size:13px">' + bj(new Date().toISOString()) + '</div></div>'
+    + '</div>'
+    + '<div class="note" style="margin-top:12px">'
+    +  '· 仓库：<a href="https://github.com/' + OPS_REPO + '" target="_blank" rel="noopener">' + OPS_REPO + '</a><br>'
+    +  '· 运行日志：<a href="https://github.com/' + OPS_REPO + '/actions" target="_blank" rel="noopener">Actions</a>'
+    +  ' · 发布设置：<a href="https://github.com/' + OPS_REPO + '/settings/pages" target="_blank" rel="noopener">Settings → Pages</a><br>'
+    +  '· 自动刷新（北京时间 · 周一至五）：<b>08:50 / 11:40 / 16:45 / 20:45</b> —— 拉数据 → 提交 → 守卫 → 发布，同一次运行内完成。<br>'
+    +  '· 手动刷新：Actions → <code>sync_data</code> → Run workflow。'
+    + '</div>';
+  box.innerHTML = h;
+}
+
 /* ══════════════ 主渲染 + 自愈轮询 ══════════════ */
 var RENDERS = [
   ['IDX', renderIndex], ['MFF', renderMff], ['AVG', renderAvg],
   ['VD', renderVerdict], ['STK', renderStocks], ['AVD', renderAvoid],
-  ['MAIN', renderMain], ['DISC', renderDisc]
+  ['MAIN', renderMain], ['DISC', renderDisc],
+  ['OPSH', renderOpsHealth], ['OPSU', renderOpsUp], ['OPSM', renderOpsMeta]
 ];
 
 function renderAll(){

@@ -1,0 +1,7 @@
+2026-11-27T01:52:07.5750000Z Evaluating refresh.if
+2026-11-27T01:52:07.5750000Z Evaluating: success()
+2026-11-27T01:52:07.5750000Z Result: true
+2026-11-27T01:52:07.8840000Z Requested labels: self-hosted, cn
+2026-11-27T01:52:07.8840000Z Job defined at: ah-quant999/quant-scanner-v8/.github/workflows/v8_bond_futures.yml@refs/heads/main
+2026-11-27T01:52:07.8840000Z Waiting for a runner to pick up this job...
+2026-11-27T01:52:08.2460000Z Job is about to start running on the runner: alimi-cn
