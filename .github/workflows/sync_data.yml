@@ -2,7 +2,7 @@ name: 🔄 v9 数据同步 + 发布
 
 # 九宝量化 v9 · 数据同步 + Pages 发布（一次运行做完，不依赖二次触发）
 #   宗旨：① 大盘走势判断  ② 未来收益率最高的股
-#   v9 只展示、不生产：数据从 v8 的 GitHub Pages 拉取（6 个 data/*.js，约 100KB）。
+#   v9 只展示、不生产：数据从 v8 的 GitHub Pages 拉取（4 个 data/*.js，约 70KB）。
 #   v8 冻结不再改代码，但其数据链继续跑；v9 借此保持独立展示。
 #   观测类数据（涨停热力/板块资金/板块强度/龙虎榜/ETF…）不进 v9，留在 v8。
 #
@@ -41,8 +41,7 @@ jobs:
         run: |
           set -u
           SRC="https://ah-quant999.github.io/quant-scanner-v8/data"
-          FILES="INDEX_QUOTES MARKET_FUND_FLOW_DATA AVG_PRICE_DATA \
-          V8_VERDICT TOP10_DAILY IMA_STRONG_BACKTEST"
+          FILES="INDEX_QUOTES MARKET_FUND_FLOW_DATA AVG_PRICE_DATA V8_VERDICT"
           OK=0; FAIL=0
           for f in $FILES; do
             TMP="data/$f.js.tmp"
@@ -80,7 +79,7 @@ jobs:
           test -f index.html || { echo "🔴 缺 index.html"; exit 1; }
           N=$(ls data/*.js 2>/dev/null | wc -l | tr -d ' ')
           echo "data/*.js = $N ；index.html = $(wc -c < index.html) B"
-          test "$N" -ge 5 || { echo "🔴 data 文件仅 $N 个（<5），疑同步残缺，拒绝发布"; exit 1; }
+          test "$N" -ge 4 || { echo "🔴 data 文件仅 $N 个（<4），疑同步残缺，拒绝发布"; exit 1; }
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

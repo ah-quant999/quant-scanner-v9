@@ -11,11 +11,11 @@
 
   页面只有两个（2026-11-27 主人令）：
     📊 大盘 = 现在大盘什么情况（指数 / 主力资金 / 平均股价）
-    🎯 选股 = 我能买哪些收益率高的股（今日结论 / 最终推荐 / 证据链）
+    🎯 选股 = 买不买 · 买多少 · 买哪几只：综合研判 / 今日可买(3 只) / 别碰 / 主线 / 仓位纪律
   其余观测类视图（涨停热力、板块资金榜、板块强度榜、龙虎榜、ETF、热力图…）一律留在 v8，不进 v9。
 
   与 v8 的关系：v8 冻结不再改动；v9 是精简重建，只保留宗旨必需的数据与视图。
-  数据同步：.github/workflows/sync_data.yml 从 v8 Pages 拉取 6 个 data/*.js。
+  数据同步：.github/workflows/sync_data.yml 从 v8 Pages 拉取 4 个 data/*.js。
   铁律：数据一律 window.X 注入，禁止 fetch('../data/...')。
 -->
 <style>
@@ -44,8 +44,9 @@ section.active{display:block}
 
 .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.c6{grid-column:span 6}.c4{grid-column:span 4}.c12{grid-column:span 12}.c8{grid-column:span 8}
-@media(max-width:900px){.c6,.c4,.c8{grid-column:span 12}}
+.c6{grid-column:span 6}.c4{grid-column:span 4}.c12{grid-column:span 12}
+.c8{grid-column:span 8}.c7{grid-column:span 7}.c5{grid-column:span 5}
+@media(max-width:900px){.c6,.c4,.c8,.c7,.c5{grid-column:span 12}}
 
 .ch{display:flex;align-items:baseline;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
 .ch h3{font-size:14px;font-weight:700}
@@ -89,6 +90,31 @@ tbody tr:hover{background:var(--panel2)}
 .pill.warn{background:rgba(255,208,36,.14);color:var(--gold);border:1px solid rgba(255,208,36,.32)}
 .pill.mute{background:rgba(148,163,184,.12);color:var(--sub);border:1px solid rgba(148,163,184,.28)}
 
+
+.act{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.act .big{font-size:27px;font-weight:800;line-height:1.1;letter-spacing:.5px}
+.para{font-size:13px;line-height:1.85;padding:7px 0;border-bottom:1px dashed rgba(36,48,64,.6)}
+.para .lb{display:inline-block;font-size:11px;color:var(--dim);margin-right:8px}
+.para.diverge{color:var(--gold)}
+.subhd{font-size:11.5px;font-weight:700;color:var(--dim);letter-spacing:.5px;margin:12px 0 5px}
+.evirow{display:flex;gap:10px;font-size:12.5px;line-height:1.7;padding:3px 0}
+.evik{flex:0 0 66px;color:var(--sub);font-weight:600}
+.eviv{flex:0 0 60px;text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.evip{flex:1;color:var(--dim);font-size:11.5px}
+.warnbar{background:rgba(255,208,36,.1);border:1px solid rgba(255,208,36,.3);color:var(--gold);
+  border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;line-height:1.7}
+.whytxt{font-size:11px;color:var(--gold);margin-top:3px}
+.why2{font-size:11px;color:var(--dim);margin-top:2px}
+.lanerow{display:flex;align-items:baseline;gap:8px;font-size:13px;padding:5px 0;
+  border-bottom:1px dashed rgba(36,48,64,.5);flex-wrap:wrap}
+.lanenum{margin-left:auto;font-size:11.5px;color:var(--sub);font-variant-numeric:tabular-nums}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:6px 0 8px}
+.chip{font-size:11.5px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:3px 8px}
+.chkrow{display:flex;gap:8px;font-size:12.5px;padding:3px 0;line-height:1.6}
+.chkrow .mk{flex:0 0 16px}
+.chkrow .cn{flex:0 0 90px;color:var(--txt)}
+.chkrow .cw{flex:1;color:var(--dim);font-size:11.5px}
+.chkrow.no .cn{color:var(--sub)}
 details{margin-top:8px}
 summary{cursor:pointer;font-size:12.5px;color:var(--sub);padding:6px 0;user-select:none}
 summary:hover{color:var(--txt)}
@@ -141,23 +167,33 @@ summary:hover{color:var(--txt)}
   </div>
 </section>
 
-<!-- ═══════════════ ② 未来收益率最高的股 ═══════════════ -->
+<!-- ═══════════ ② 买不买 · 买多少 · 买哪几只（只给 3 只） ═══════════ -->
 <section id="sec-pick">
   <div class="grid">
 
     <div class="card c12">
-      <div class="ch"><h3>今日结论</h3><span class="tag">服务 ② · 一句话</span><span class="ts" id="ts-vd">—</span></div>
+      <div class="ch"><h3>综合研判</h3><span class="tag" id="vdTag">判断买不买 · 买多少</span><span class="ts" id="ts-vd">—</span></div>
       <div class="cb" id="vdBox"><div class="empty">加载中…</div></div>
     </div>
 
-    <div class="card c8">
-      <div class="ch"><h3>最终推荐</h3><span class="tag" id="frTag">—</span><span class="ts" id="ts-top">—</span></div>
-      <div class="cb" id="topBox"><div class="empty">加载中…</div></div>
+    <div class="card c7">
+      <div class="ch"><h3>今日可买</h3><span class="tag" id="stkTag">最有把握的 3 只</span><span class="ts" id="ts-stk">—</span></div>
+      <div class="cb" id="stkBox"><div class="empty">加载中…</div></div>
     </div>
 
-    <div class="card c4">
-      <div class="ch"><h3>证据链</h3><span class="tag">同口径样本外</span><span class="ts" id="ts-evi">—</span></div>
-      <div class="cb" id="eviBox"><div class="empty">加载中…</div></div>
+    <div class="card c5">
+      <div class="ch"><h3>别碰</h3><span class="tag">涨着却在流出 / 净流出</span></div>
+      <div class="cb" id="avoidBox"><div class="empty">加载中…</div></div>
+    </div>
+
+    <div class="card c7">
+      <div class="ch"><h3>主线 · 哪些能进</h3><span class="tag">钱在等进 / 今日接力</span></div>
+      <div class="cb" id="mainBox"><div class="empty">加载中…</div></div>
+    </div>
+
+    <div class="card c5">
+      <div class="ch"><h3>仓位纪律</h3><span class="tag" id="disTag">加仓检查表</span></div>
+      <div class="cb" id="disBox"><div class="empty">加载中…</div></div>
     </div>
 
   </div>
@@ -169,16 +205,14 @@ summary:hover{color:var(--txt)}
 <script src="data/MARKET_FUND_FLOW_DATA.js" defer></script>
 <script src="data/AVG_PRICE_DATA.js" defer></script>
 <script src="data/V8_VERDICT.js" defer></script>
-<script src="data/TOP10_DAILY.js" defer></script>
-<script src="data/IMA_STRONG_BACKTEST.js" defer></script>
 
 <script>
 /* ══════════════════════════════════════════════════════════════
    九宝量化 v9 渲染层
-   原则：① 大盘 / ② 选股，两页六卡（2026-11-27 主人令：观测类留 v8）。
+   原则：① 大盘 3 卡 / ② 选股 5 卡，八卡（2026-11-27 主人令：观测类留 v8，选股只给 3 只）。
    降级铁律（继承 v8 血证）：
      · 任何数据缺失 ⇒ 明示「未到位」，绝不用陈旧数据冒充当日。
-     · 榜单 validity≠ok 或 max_score<健康阈值 ⇒ 只出「候选观察」，不摆伪 Top5。
+     · 研判 buy.mode=none ⇒ 个股清单只作观察名单，绝不标成买入指令。
    ══════════════════════════════════════════════════════════════ */
 (function(){
 'use strict';
@@ -276,148 +310,207 @@ function renderAvg(){
   box.innerHTML = h;
 }
 
-/* ══════════════ ② 选股 ══════════════ */
+/* ══════════════ ② 买不买 · 买多少 · 买哪几只 ══════════════ */
 
+var V = function(){ return window.V8_VERDICT || {}; };
+
+/* 数据里带 **不加仓** 这类粗体标记，转成 <b> 后再输出 */
+function md(t){
+  return esc(t).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+}
+
+/* ── 综合研判：动作 / 大盘定性 / 所以 / 怎么做 / 理由 ── */
 function renderVerdict(){
-  var D = window.V8_VERDICT || {};
-  var box = $('vdBox');
-  if(!D.buy && !D.position){ box.innerHTML='<div class="empty">结论未到位（data/V8_VERDICT.js）</div>'; return; }
+  var D = V(), box = $('vdBox');
+  if(!D.head && !D.buy){ box.innerHTML = '<div class="empty">研判未到位（data/V8_VERDICT.js）</div>'; return; }
   markTs($('ts-vd'), D.update_time);
-  var buy = D.buy || {}, pos = D.position || {};
-  var ans = buy.answer_short || buy.answer || '—';
-  var c = /买|加仓|进攻/.test(ans) ? 'up' : (/不买|空仓|防守|观察/.test(ans) ? 'down' : 'flat');
-  var h = '<div style="font-size:19px;font-weight:700;margin-bottom:8px" class="'+c+'">'+esc(ans)+'</div>';
-  if(buy.answer && buy.answer!==ans) h += '<div class="note" style="margin-bottom:8px">'+esc(buy.answer)+'</div>';
-  if(pos.label) h += '<div style="margin-bottom:6px"><span class="pill mute">仓位 '+esc(pos.label)+'</span></div>';
-  if(D.caveat) h += '<div class="note" style="margin-top:8px;border-top:1px dashed var(--border);padding-top:8px">⚠️ '+esc(D.caveat)+'</div>';
-  if(D.list_check) h += '<div class="note" style="margin-top:6px">名单校验：'+esc(typeof D.list_check==='string'?D.list_check:JSON.stringify(D.list_check))+'</div>';
+
+  var head = D.head || {}, buy = D.buy || {}, pos = D.position || {}, plain = D.plain || {};
+  var add = (D.triggers || {}).add || {};
+  var hit = num(add.hit) || 0, total = num(add.total) || 0, need = num(add.need) || 0;
+
+  var noBuy = (String(buy.mode) === 'none') || !(num(buy.factor) > 0);
+  var act = noBuy ? '不买' : (buy.mode_txt || '可动手');
+  var actCls = String(head.stance) === 'attack' ? 'up' : (String(head.stance) === 'defense' ? 'down' : 'gold');
+
+  var h = '<div class="act">'
+    + '<div class="big ' + actCls + '">' + esc(act) + '</div>'
+    + '<span class="pill mute">' + esc(head.icon || '') + ' ' + esc(head.label || '—') + '</span>'
+    + '<span class="pill mute">仓位上限 ' + (pos.cap_pct == null ? '—' : esc(pos.cap_pct) + '%') + '</span>'
+    + '<span class="pill ' + (total > 0 && hit >= need ? 'up' : 'warn') + '">加仓条件 ' + hit + '/' + total + '</span>'
+    + '</div>';
+
+  if(buy.answer) h += '<div class="note" style="font-size:13px;color:var(--txt);margin-bottom:8px">' + md(buy.answer) + '</div>';
+  if(plain['读今天']) h += '<div class="para"><span class="lb">大盘定性</span>' + md(plain['读今天']) + '</div>';
+  if(plain['所以'])   h += '<div class="para"><span class="lb">所以</span>' + md(plain['所以']) + '</div>';
+  if(plain['怎么做']) h += '<div class="para"><span class="lb">怎么做</span>' + md(plain['怎么做']) + '</div>';
+  if(pos.diverge)     h += '<div class="para diverge"><span class="lb">分歧点</span>' + md(pos.diverge) + '</div>';
+
+  var ev = D.evidence || [];
+  if(ev.length){
+    h += '<div class="subhd">理由（' + ev.length + ' 条信号）</div>';
+    ev.forEach(function(e){
+      var v = String(e.value == null ? '' : e.value);
+      var vc = /[:：]/.test(v) ? 'gold' : (/fail/i.test(v) ? 'gold' : cls(num(v)));
+      h += '<div class="evirow"><span class="evik">' + esc(e.name) + '</span>'
+        +  '<span class="eviv ' + vc + '">' + esc(v) + '</span>'
+        +  '<span class="evip">' + md(e.plain) + '</span></div>';
+    });
+  }
+
+  var alpha = D.alpha || {}, tail = '';
+  if(alpha.verdict) tail += '<div>策略超额（样本外）：<b class="' + (/fail/i.test(alpha.verdict) ? 'gold' : 'up') + '">'
+    + esc(alpha.verdict) + '</b>' + (alpha.ir_oos == null ? '' : ' · IR ' + esc(alpha.ir_oos)) + '</div>';
+  if(D.caveat) tail += '<div style="margin-top:6px">' + md(D.caveat) + '</div>';
+  if(tail) h += '<details><summary>护栏与局限（必读）</summary><div class="note" style="margin-top:6px">' + tail + '</div></details>';
+
+  if(D.list_check && D.list_check.met === false){
+    h += '<div class="note" style="margin-top:8px;color:var(--gold)">榜单闸门未过：' + esc(D.list_check.why || '') + '</div>';
+  }
   box.innerHTML = h;
 }
 
-/* 质量闸（继承 v8 教训）：validity≠ok 或 max_score<阈值 ⇒ 不摆伪 Top5 */
-var HEALTH_MIN_SCORE = 10;
+/* ── 今日可买：最多 3 只，逐只列理由 ── */
+function renderStocks(){
+  var D = V(), box = $('stkBox'), tag = $('stkTag');
+  markTs($('ts-stk'), D.update_time);
+  var buy = D.buy || {}, arr = buy.stocks || [], siz = D.sizing || {};
+  var noBuy = (String(buy.mode) === 'none') || !(num(buy.factor) > 0);
 
-function normTop10(s){
-  if(!s) return null;
-  return {
-    code: String(s.code||'').replace(/^\./,''),
-    name: s.name, board: s.board,
-    close: s.close, pct_chg: s.pct_chg,
-    score: num(s.total_score),
-    industry: s.industry,
-    sig: s.sig_count,
-    stop: s.stop_loss, target: s.target_price, rr: s.risk_reward
-  };
-}
-
-function renderTop(){
-  var TD = window.TOP10_DAILY || {};
-  var box = $('topBox'), tag = $('frTag');
-  var list = (TD.top10||[]).slice().sort(function(a,b){ return (num(b.total_score)||0)-(num(a.total_score)||0); });
-  if(!list.length){
-    box.innerHTML = '<div class="empty">📭 今日最终推荐未算出<br><span style="font-size:12px">等待盘后算法生成终选输出（TOP10_DAILY）</span></div>';
-    tag.textContent = '今日未算出'; return;
-  }
-  markTs($('ts-top'), TD.update_time);
-  var v = TD.validity || {};
-  var ok = (String(v.status||'')==='ok') && (num(v.max_score)||0) >= HEALTH_MIN_SCORE;
-
-  if(!ok){
-    tag.innerHTML = '<span class="pill warn">榜单降级 · 只出候选观察</span>';
-    var head = '<div class="note" style="padding:4px 0 12px;line-height:1.85">'
-      + '<b class="gold">今日只出「候选观察」，不展示 Top5</b><br>'
-      + 'validity=' + esc(v.status||'缺失') + ' · max_score=' + (v.max_score==null?'—':esc(v.max_score))
-      + '（健康阈值 ≥'+HEALTH_MIN_SCORE+'）<br>'
-      + '原因：' + esc(v.reason||'榜单分辨度不足或状态降级')
-      + '<br>分数接近并列不等于「未来收益率最高」，故不硬排前 5。</div>';
-    box.innerHTML = head + candidateTable(list, 20, true);
+  if(!arr.length){
+    tag.innerHTML = '<span class="pill warn">今日 0 只</span>';
+    box.innerHTML = '<div class="empty">今日因子榜没有个股入池 —— 不硬凑，空仓也是一种仓位</div>';
     return;
   }
 
-  tag.innerHTML = '<span class="pill up">榜单有效</span>';
-  var top5 = list.slice(0,5).map(normTop10).filter(Boolean);
+  var can = 0;
+  arr.forEach(function(x){ if(x.buyable) can++; });
+  tag.innerHTML = noBuy
+    ? '<span class="pill warn">可买 0 只 · 下列只观察</span>'
+    : '<span class="pill up">可买 ' + can + ' / ' + arr.length + ' 只</span>';
+
   var h = '';
-  top5.forEach(function(s,i){
+  if(noBuy) h += '<div class="warnbar">今天可买额度 <b>0%</b> —— 下面 ' + arr.length + ' 只只是观察名单，<b>不是买入指令</b>。</div>';
+
+  arr.forEach(function(x, i){
     h += '<div class="stockrow">'
-      +  '<div class="rk '+(i===0?'top':'')+'">'+(i+1)+'</div>'
-      +  '<div><div class="snm">'+esc(s.name)+'<span class="scd">'+esc(s.code)+'</span></div>'
-      +  '<div class="scd">'+(s.industry?esc(s.industry)+' · ':'')+'止损 '+fmt(s.stop)+' / 目标 '+fmt(s.target)+'</div></div>'
-      +  '<div class="srt"><div class="sc gold num">'+fmt(s.score,1)+'</div>'
-      +  '<div class="pc '+cls(s.pct_chg)+'">'+(s.pct_chg==null?'—':sgn(s.pct_chg)+'%')+'</div></div>'
-      +  '</div>';
+      +  '<div class="rk ' + (i === 0 ? 'top' : '') + '">' + (x.rank || i + 1) + '</div>'
+      +  '<div style="flex:1;min-width:0">'
+      +    '<div class="snm">' + esc(x.name) + '<span class="scd">' + esc(x.code) + '</span>'
+      +      (x.buyable ? '<span class="pill up" style="margin-left:8px">可买</span>'
+                       : '<span class="pill mute" style="margin-left:8px">等企稳</span>') + '</div>'
+      +    '<div class="scd">' + esc(x.industry || '—') + '</div>'
+      +    '<div class="whytxt">' + esc(x.why || '') + '</div>'
+      +  '</div>'
+      +  '<div class="srt">'
+      +    '<div class="sc num">' + fmt(x.close) + '</div>'
+      +    '<div class="pc ' + cls(x.chg) + '">' + sgn(x.chg) + '%</div>'
+      +    '<div class="pc">止 ' + fmt(x.stop) + ' / 目 ' + fmt(x.target) + '</div>'
+      +    '<div class="pc">盈亏比 ' + fmt(x.rr, 2) + '</div>'
+      +  '</div></div>';
   });
-  h += '<div class="note" style="margin-top:10px">口径：金股池按因子综合分降序前 5（同源同序，非收益承诺）。'
-    + ' 上游 IC 门禁与 OOS 证据见右侧「证据链」。</div>';
-  h += candidateTable(list, 20, false);
+
+  if(siz.rule) h += '<div class="note" style="margin-top:10px;border-top:1px dashed var(--border);padding-top:8px">仓位口径：' + md(siz.rule) + '</div>';
   box.innerHTML = h;
 }
 
-function candidateTable(list, n, openDefault){
-  var rows = list.slice(0,n).map(normTop10).filter(Boolean);
-  if(!rows.length) return '';
-  var h = '<details'+(openDefault?' open':'')+'><summary>候选池（'+rows.length+' 只）— 点击展开</summary>'
-    + '<table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>综合分</th><th>涨跌</th></tr></thead><tbody>';
-  rows.forEach(function(s,i){
-    h += '<tr><td class="dim num">'+(i+1)+'</td>'
-      +  '<td>'+esc(s.name)+' <span class="dim" style="font-size:11px">'+esc(s.code)+'</span></td>'
-      +  '<td class="dim" style="font-size:12px">'+esc(s.industry||'—')+'</td>'
-      +  '<td class="num gold" style="text-align:right">'+fmt(s.score,1)+'</td>'
-      +  '<td class="'+cls(s.pct_chg)+' num" style="text-align:right">'+(s.pct_chg==null?'—':sgn(s.pct_chg)+'%')+'</td></tr>';
+/* ── 别碰 ── */
+function renderAvoid(){
+  var D = V(), box = $('avoidBox');
+  var arr = D.avoid || [];
+  if(!arr.length){ box.innerHTML = '<div class="empty">今日无明确禁区</div>'; return; }
+  var h = '<table><thead><tr><th>板块</th><th>当日</th><th>资金</th></tr></thead><tbody>';
+  arr.forEach(function(x){
+    h += '<tr><td>' + esc(x.name) + '<div class="why2">' + esc(x.why || '') + '</div></td>'
+      +  '<td class="' + cls(x.chg) + ' num" style="text-align:right">' + sgn(x.chg) + '%</td>'
+      +  '<td class="' + cls(x.net) + ' num" style="text-align:right">' + sgn(x.net) + ' 亿</td></tr>';
   });
-  h += '</tbody></table></details>';
-  return h;
+  h += '</tbody></table>';
+  if(D.avoid_note) h += '<div class="note" style="margin-top:10px">' + md(D.avoid_note) + '</div>';
+  box.innerHTML = h;
 }
 
-function renderEvidence(){
-  var IM = window.IMA_STRONG_BACKTEST || {};
-  var TD = window.TOP10_DAILY || {};
-  var box = $('eviBox');
-  var o = IM.oos_segment || {};
+/* ── 主线：L1 钱在等进 / L2 今日接力 ── */
+function renderMain(){
+  var D = V(), box = $('mainBox'), buy = D.buy || {};
+  var secs = buy.sectors || [], chase = buy.chase || [];
+  if(!secs.length && !chase.length){ box.innerHTML = '<div class="empty">主线数据未到位</div>'; return; }
   var h = '';
-  markTs($('ts-evi'), IM.update_time);
+  if(secs.length){
+    h += '<div class="subhd">L1 钱在等进（连续净流入，还没成型标的）</div>';
+    secs.forEach(function(x){
+      h += '<div class="lanerow"><b>' + esc(x.name) + '</b>'
+        +  '<span class="dim" style="font-size:11px">' + esc(x.type || '') + '</span>'
+        +  '<span class="lanenum">今 ' + sgn(x.net_today) + ' 亿 · 5日 ' + sgn(x.net_5d) + ' 亿 · 连 ' + esc(x.days) + ' 天</span></div>';
+    });
+  }
+  if(chase.length){
+    h += '<div class="subhd" style="margin-top:12px">L2 今日接力（涨停最集中 · 追高区，等回调不追）</div>';
+    chase.forEach(function(x){
+      h += '<div class="lanerow"><b>' + esc(x.name) + '</b>'
+        +  '<span class="lanenum">今日涨停 ' + esc(x.today) + ' 家 · 5日 ' + esc(x.sum5) + ' 家</span></div><div class="chips">';
+      (x.leaders || []).forEach(function(l){
+        h += '<span class="chip">' + esc(l.name) + ' <b class="' + cls(l.chg) + '">' + sgn(l.chg) + '%</b></span>';
+      });
+      h += '</div>';
+    });
+  }
+  box.innerHTML = h;
+}
 
-  /* 选股榜单健康度 */
-  var v = TD.validity || {};
-  var vc = String(v.status||'')==='ok' ? 'up' : 'warn';
-  h += '<div style="margin-bottom:12px">'
-    +  '<div class="k dim" style="font-size:11px">榜单健康度</div>'
-    +  '<div style="margin-top:4px"><span class="pill '+vc+'">'+esc(v.status||'缺失')+'</span>'
-    +  ' <span class="dim" style="font-size:11.5px">max_score='+(v.max_score==null?'—':esc(v.max_score))+'</span></div>'
-    +  (v.reason?'<div class="note" style="margin-top:4px">'+esc(v.reason)+'</div>':'')
+/* ── 仓位纪律：单票/首批/最多几只/止损 + 加仓检查表 + 降档条件 ── */
+function renderDisc(){
+  var D = V(), box = $('disBox'), tag = $('disTag');
+  var siz = D.sizing || {}, trg = D.triggers || {}, add = trg.add || {};
+  var items = add.items || [], need = num(add.need) || 0;
+  var hit = num(add.hit) || 0, total = num(add.total) || 0;
+
+  tag.innerHTML = '<span class="pill ' + (need && hit >= need ? 'up' : 'warn') + '">加仓 ' + hit + '/' + total
+    + (need ? '（需 ' + esc(need) + '）' : '') + '</span>';
+
+  var capPct = num((D.position || {}).cap_pct), maxPos = num(siz.max_positions);
+  var base = (capPct != null && maxPos) ? capPct / maxPos : null;   /* 满档单票 */
+  var h = '<div class="kv">'
+    +  '<div class="kvitem"><div class="k">单票（满档 / 今日）</div><div class="v num">'
+    +    (base == null ? '—' : fmt(base, 1) + '%')
+    +    ' <span style="font-size:12px;color:var(--gold)">/ ' + fmt(siz.per_stock_pct, 1) + '%</span></div></div>'
+    +  '<div class="kvitem"><div class="k">首批（今日）</div><div class="v num">' + fmt(siz.first_batch_pct, 1) + '%</div></div>'
+    +  '<div class="kvitem"><div class="k">最多持股</div><div class="v num">' + (maxPos == null ? '—' : esc(maxPos) + ' 只') + '</div></div>'
+    +  '<div class="kvitem"><div class="k">单票止损</div><div class="v down num">' + (siz.stop_loss_pct == null ? '—' : esc(siz.stop_loss_pct) + '%') + '</div></div>'
     +  '</div>';
 
-  /* 强势跟踪 OOS（真样本外） */
-  if(o.verdict){
-    var is = (o.in_sample||{})['5'] || {}, oos = (o.out_of_sample||{})['5'] || {};
-    var bad = /^fail|insufficient/.test(String(o.verdict));
-    h += '<div style="border-top:1px dashed var(--border);padding-top:10px">'
-      +  '<div class="dim" style="font-size:11px">强势跟踪 · 样本外验证</div>'
-      +  '<div style="margin-top:5px"><span class="pill '+(bad?'warn':'up')+'">'
-      +  (bad?'未通过':'通过')+'</span> <span class="dim" style="font-size:11.5px">切点 '+esc(o.split_date||'—')+'</span></div>'
-      +  '<table style="margin-top:8px"><thead><tr><th>档</th><th>样本内</th><th>样本外</th></tr></thead><tbody>'
-      +  '<tr><td>T+5</td>'
-      +  '<td class="'+cls(is.avg_return)+' num" style="text-align:right">'+(is.n==null?'—':(is.win_rate+'% / '+sgn(is.avg_return)+'%'))+'</td>'
-      +  '<td class="'+cls(oos.avg_return)+' num" style="text-align:right">'+(oos.n==null?'—':(oos.win_rate+'% / '+sgn(oos.avg_return)+'%'))+'</td></tr>'
-      +  '</tbody></table>'
-      +  '<div class="note" style="margin-top:8px">'+esc(o.verdict)+'</div>'
-      +  '</div>';
-  } else {
-    h += '<div class="note" style="border-top:1px dashed var(--border);padding-top:10px">'
-      +  '强势跟踪 OOS 分段未产出（等待回测链重跑）。</div>';
+  if(items.length){
+    h += '<div class="subhd">加仓检查表（凑够 ' + (need || '—') + ' 条才加）</div>';
+    items.forEach(function(i){
+      h += '<div class="chkrow ' + (i.met ? 'ok' : 'no') + '"><span class="mk">' + (i.met ? '✅' : '❌') + '</span>'
+        +  '<span class="cn">' + esc(i.name || '') + '</span>'
+        +  '<span class="cw">' + esc(i.now || '') + '</span></div>';
+    });
   }
+
+  var cut = trg.cut || {}, citems = cut.items || [];
+  if(citems.length){
+    h += '<div class="subhd" style="margin-top:12px">立刻降档（' + esc(cut.rule || '') + '）</div><div class="note">';
+    citems.forEach(function(c){ h += '· ' + esc(c.cond || '') + ' ⇒ <b>' + esc(c.act || '') + '</b><br>'; });
+    h += '</div>';
+  }
+  if((trg.exit || {}).rule) h += '<div class="note" style="margin-top:8px">回撤纪律：' + esc(trg.exit.rule) + '</div>';
   box.innerHTML = h;
 }
 
 /* ══════════════ 主渲染 + 自愈轮询 ══════════════ */
 var RENDERS = [
   ['IDX', renderIndex], ['MFF', renderMff], ['AVG', renderAvg],
-  ['VD', renderVerdict], ['TOP', renderTop], ['EVI', renderEvidence]
+  ['VD', renderVerdict], ['STK', renderStocks], ['AVD', renderAvoid],
+  ['MAIN', renderMain], ['DISC', renderDisc]
 ];
 
 function renderAll(){
   RENDERS.forEach(function(r){ try{ r[1](); }catch(e){ console.warn('[v9]', r[0], e); } });
-  var TD = window.TOP10_DAILY || {};
-  $('hdMeta').textContent = TD.update_time ? ('榜单 '+ts(TD.update_time)) : '数据加载中…';
+  var D = window.V8_VERDICT || {};
+  $('hdMeta').textContent = D.update_time
+    ? ('研判 ' + ts(D.update_time) + ' · ' + ((D.head || {}).label || ''))
+    : '数据加载中…';
 }
 
 function boot(){
@@ -427,7 +520,7 @@ function boot(){
   /* 自愈：defer 脚本可能晚于首次渲染，600ms×20 内补渲 */
   var n=0, timer=setInterval(function(){
     n++;
-    var any = (window.INDEX_QUOTES||window.TOP10_DAILY||window.V8_VERDICT);
+    var any = (window.INDEX_QUOTES||window.V8_VERDICT);
     if(any){ clearInterval(timer); renderAll(); }
     else if(n>20){ clearInterval(timer); }
   }, 600);
