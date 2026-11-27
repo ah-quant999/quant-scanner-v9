@@ -38,6 +38,9 @@ jobs:
           echo "index.html = $(wc -c < index.html) B"
 
       - uses: actions/configure-pages@v5
+        with:
+          # 首次运行时自动创建 Pages 站点（build_type=workflow），否则 deploy-pages 报 Get Pages site failed
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
