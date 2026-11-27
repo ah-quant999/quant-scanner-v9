@@ -2,7 +2,7 @@ name: 🚀 v9 部署 Pages
 
 # 九宝量化 v9 · 静态站部署
 #   纯静态（单 index.html + data/*.js），无构建步骤。
-#   守卫：部署前校验 index.html 存在且 data/ 至少 4 个文件（v9 只需 4 个，<4 视为同步残缺）。
+#   守卫：部署前校验 index.html 存在且 data/ 至少 1 个文件（v9 只剩 V8_VERDICT，<1 视为同步残缺）。
 
 on:
   push:
@@ -34,7 +34,7 @@ jobs:
           test -f index.html || { echo "🔴 缺 index.html"; exit 1; }
           N=$(ls data/*.js 2>/dev/null | wc -l | tr -d ' ')
           echo "data/*.js = $N"
-          test "$N" -ge 4 || { echo "🔴 data 文件仅 $N 个（<4），疑同步残缺，拒绝部署"; exit 1; }
+          test "$N" -ge 1 || { echo "🔴 data 文件仅 $N 个（<1），疑同步残缺，拒绝部署"; exit 1; }
           echo "index.html = $(wc -c < index.html) B"
 
       - uses: actions/configure-pages@v5
