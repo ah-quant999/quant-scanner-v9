@@ -175,7 +175,7 @@ summary:hover{color:var(--txt)}
 <script>
 /* ══════════════════════════════════════════════════════════════
    九宝量化 v9 渲染层
-   原则：① 大盘 / ② 选股，两页十卡。
+   原则：① 大盘 / ② 选股，两页六卡（2026-11-27 主人令：观测类留 v8）。
    降级铁律（继承 v8 血证）：
      · 任何数据缺失 ⇒ 明示「未到位」，绝不用陈旧数据冒充当日。
      · 榜单 validity≠ok 或 max_score<健康阈值 ⇒ 只出「候选观察」，不摆伪 Top5。
@@ -190,6 +190,24 @@ function fmt(v,d){ var n=num(v); return n==null?'—':n.toFixed(d==null?2:d); }
 function sgn(v,d){ var n=num(v); if(n==null) return '—'; return (n>0?'+':'')+n.toFixed(d==null?2:d); }
 function cls(v){ var n=num(v); if(n==null) return 'flat'; return n>0?'up':(n<0?'down':'flat'); }
 function ts(s){ return s? String(s).replace('T',' ').slice(0,16) : '—'; }
+
+/* 陈旧度标注：盘后数据 T-1 正常；T-2 灰（周末）；>=3 天金色告警，绝不用陈旧冒充当日 */
+function dayDiff(d){
+  var m = String(d||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return null;
+  var t = Date.UTC(+m[1], +m[2]-1, +m[3]);
+  var n = new Date();
+  var now = Date.UTC(n.getFullYear(), n.getMonth(), n.getDate());
+  return Math.round((now - t) / 864e5);
+}
+function markTs(el, v){
+  if(!el) return;
+  var n = dayDiff(v);
+  var base = esc(ts(v));
+  if(n == null || n <= 0){ el.innerHTML = base; return; }
+  if(n >= 3) el.innerHTML = base + ' <b class="gold">· 陈旧 '+n+' 天</b>';
+  else       el.innerHTML = base + ' <span class="dim">· T-'+n+'</span>';
+}
 
 /* ── 页签切换（记忆上次位置） ── */
 var tabs = document.querySelectorAll('.tab');
@@ -208,7 +226,7 @@ function renderIndex(){
   var items = D.items || [];
   var box = $('idxBox');
   if(!items.length){ box.innerHTML='<div class="empty">指数数据未到位（data/INDEX_QUOTES.js）</div>'; return; }
-  $('ts-idx').textContent = ts(D.update_time);
+  markTs($('ts-idx'), D.update_time);
   var h='';
   items.slice(0,4).forEach(function(x){
     var c = cls(x.change);
@@ -228,7 +246,7 @@ function renderMff(){
   var daily = D.daily || [];
   if(!daily.length){ box.innerHTML='<div class="empty">资金数据未到位</div>'; return; }
   var d = daily[daily.length-1];
-  $('ts-mff').textContent = d.date ? String(d.date).replace(/^(\d{4})(\d{2})(\d{2})$/,'$1-$2-$3') : ts(D.update_time);
+  markTs($('ts-mff'), d.date ? String(d.date).replace(/^(\d{4})(\d{2})(\d{2})$/,'$1-$2-$3') : D.update_time);
   var net = num(d.net_yi);
   var h = '<div class="kv">'
     + '<div class="kvitem"><div class="k">主力净额</div><div class="v '+cls(net)+'">'+sgn(net)+' 亿</div></div>'
@@ -246,7 +264,7 @@ function renderAvg(){
   var D = window.AVG_PRICE_DATA || {};
   var box = $('avgBox');
   if(D.avg_price==null){ box.innerHTML='<div class="empty">平均股价未到位</div>'; return; }
-  $('ts-avg').textContent = D.date || '—';
+  markTs($('ts-avg'), D.date);
   var pos = num(D.position_vs_ma20);
   var h = '<div class="kv">'
     + '<div class="kvitem"><div class="k">平均股价</div><div class="v num">'+fmt(D.avg_price,2)+'</div></div>'
@@ -264,7 +282,7 @@ function renderVerdict(){
   var D = window.V8_VERDICT || {};
   var box = $('vdBox');
   if(!D.buy && !D.position){ box.innerHTML='<div class="empty">结论未到位（data/V8_VERDICT.js）</div>'; return; }
-  $('ts-vd').textContent = ts(D.update_time);
+  markTs($('ts-vd'), D.update_time);
   var buy = D.buy || {}, pos = D.position || {};
   var ans = buy.answer_short || buy.answer || '—';
   var c = /买|加仓|进攻/.test(ans) ? 'up' : (/不买|空仓|防守|观察/.test(ans) ? 'down' : 'flat');
@@ -300,7 +318,7 @@ function renderTop(){
     box.innerHTML = '<div class="empty">📭 今日最终推荐未算出<br><span style="font-size:12px">等待盘后算法生成终选输出（TOP10_DAILY）</span></div>';
     tag.textContent = '今日未算出'; return;
   }
-  $('ts-top').textContent = ts(TD.update_time);
+  markTs($('ts-top'), TD.update_time);
   var v = TD.validity || {};
   var ok = (String(v.status||'')==='ok') && (num(v.max_score)||0) >= HEALTH_MIN_SCORE;
 
@@ -356,7 +374,7 @@ function renderEvidence(){
   var box = $('eviBox');
   var o = IM.oos_segment || {};
   var h = '';
-  $('ts-evi').textContent = ts(IM.update_time);
+  markTs($('ts-evi'), IM.update_time);
 
   /* 选股榜单健康度 */
   var v = TD.validity || {};
