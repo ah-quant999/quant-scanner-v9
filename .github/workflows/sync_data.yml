@@ -1,0 +1,69 @@
+name: 🔄 v9 数据同步(从 v8)
+
+# 九宝量化 v9 · 数据同步
+#   宗旨：① 大盘走势判断  ② 未来收益率最高的股
+#   v9 只展示、不生产：数据从 v8 的 GitHub Pages 拉取（6 个 data/*.js，约 102KB）。
+#   v8 冻结不再改代码，但其数据链继续跑；v9 借此保持独立展示。
+#   观测类数据（涨停热力/板块资金/板块强度/龙虎榜/ETF…）不进 v9，留在 v8。
+#
+# 铁律：拉取失败/文件过小/不含 window. ⇒ 保留旧文件，绝不写入空文件（防空结果固化）。
+
+on:
+  schedule:
+    # 北京时间 = UTC+8。盘前 08:40 / 盘中 11:35 / 盘后 16:40 / 夜间 20:40
+    - cron: '40 0 * * 1-5'
+    - cron: '35 3 * * 1-5'
+    - cron: '40 8 * * 1-5'
+    - cron: '40 12 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: v9-sync-data
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 拉取 v8 数据（失败保留旧文件）
+        run: |
+          set -u
+          SRC="https://ah-quant999.github.io/quant-scanner-v8/data"
+          FILES="INDEX_QUOTES MARKET_FUND_FLOW_DATA AVG_PRICE_DATA \
+          V8_VERDICT TOP10_DAILY IMA_STRONG_BACKTEST"
+          OK=0; FAIL=0
+          for f in $FILES; do
+            TMP="data/$f.js.tmp"
+            if curl -fsS --retry 3 --retry-delay 2 --max-time 45 \
+                 -H 'Cache-Control: no-cache' -o "$TMP" "$SRC/$f.js?cb=$(date +%s)"; then
+              SZ=$(wc -c < "$TMP" | tr -d ' ')
+              if [ "$SZ" -gt 200 ] && head -c 2000 "$TMP" | grep -q 'window\.'; then
+                mv "$TMP" "data/$f.js"; OK=$((OK+1)); echo "  ✅ $f  ${SZ}B"
+              else
+                rm -f "$TMP"; FAIL=$((FAIL+1)); echo "  ⚠️ $f 校验不过（${SZ}B 或无 window.），保留旧文件"
+              fi
+            else
+              rm -f "$TMP"; FAIL=$((FAIL+1)); echo "  ⚠️ $f 拉取失败，保留旧文件"
+            fi
+          done
+          echo "── 成功 $OK / 失败 $FAIL ──"
+          if [ "$OK" -eq 0 ]; then echo "🔴 全部失败，中止（不产生空提交）"; exit 1; fi
+
+      - name: 统计并提交
+        run: |
+          set -e
+          NEW=$(git status --porcelain data/ | wc -l | tr -d ' ')
+          echo "变更文件数：$NEW"
+          ls -la data/ | head -20
+          if [ "$NEW" -eq 0 ]; then echo "⏭️ 无变更"; exit 0; fi
+          git config user.name  "v9-sync-bot"
+          git config user.email "v9-sync-bot@users.noreply.github.com"
+          git add data/
+          git commit -m "chore(data): v9 同步 v8 数据 $(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M')"
+          git push

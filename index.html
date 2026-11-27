@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>九宝量化 v9 · 大盘 + 选股</title>
+<!--
+  九宝量化 v9 · 唯一宗旨（铁律 P0 ⓪，2026-11-27 主人令）
+    ① 判断大盘走势   ② 选出未来收益率最高的股
+  本站只做这两件事。任何卡片必须先回答「服务 ① 还是 ②」，答不上来不进本站。
+
+  页面只有两个（2026-11-27 主人令）：
+    📊 大盘 = 现在大盘什么情况（指数 / 主力资金 / 平均股价）
+    🎯 选股 = 我能买哪些收益率高的股（今日结论 / 最终推荐 / 证据链）
+  其余观测类视图（涨停热力、板块资金榜、板块强度榜、龙虎榜、ETF、热力图…）一律留在 v8，不进 v9。
+
+  与 v8 的关系：v8 冻结不再改动；v9 是精简重建，只保留宗旨必需的数据与视图。
+  数据同步：.github/workflows/sync_data.yml 从 v8 Pages 拉取 6 个 data/*.js。
+  铁律：数据一律 window.X 注入，禁止 fetch('../data/...')。
+-->
+<style>
+:root{
+  --bg:#0d1117; --panel:#151b23; --panel2:#1b222c; --border:#243040;
+  --txt:#e6edf3; --sub:#9aa7b8; --dim:#6b7a8d;
+  --up:#ef5350; --down:#26a69a; --gold:#ffd024; --blue:#41c9ff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;padding-bottom:40px}
+a{color:var(--blue);text-decoration:none}
+
+header{position:sticky;top:0;z-index:20;background:rgba(13,17,23,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--border)}
+.hd{max-width:1280px;margin:0 auto;padding:12px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-size:17px;font-weight:700;letter-spacing:.3px}
+.brand span{color:var(--gold)}
+.hdmeta{font-size:12px;color:var(--dim);margin-left:auto}
+.tabs{max-width:1280px;margin:0 auto;padding:0 18px;display:flex;gap:8px}
+.tab{padding:9px 18px;border-radius:8px 8px 0 0;cursor:pointer;font-size:14px;font-weight:600;color:var(--sub);border:1px solid transparent;border-bottom:none;user-select:none}
+.tab:hover{color:var(--txt);background:var(--panel2)}
+.tab.active{color:var(--gold);background:var(--panel);border-color:var(--border)}
+
+main{max-width:1280px;margin:0 auto;padding:16px 18px}
+section{display:none}
+section.active{display:block}
+
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.c6{grid-column:span 6}.c4{grid-column:span 4}.c12{grid-column:span 12}.c8{grid-column:span 8}
+@media(max-width:900px){.c6,.c4,.c8{grid-column:span 12}}
+
+.ch{display:flex;align-items:baseline;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.ch h3{font-size:14px;font-weight:700}
+.ch .tag{font-size:11px;color:var(--dim)}
+.ch .ts{margin-left:auto;font-size:11px;color:var(--dim);white-space:nowrap}
+.cb{padding:14px}
+
+.up{color:var(--up)}.down{color:var(--down)}.flat{color:var(--sub)}
+.num{font-variant-numeric:tabular-nums}
+.dim{color:var(--dim)}.sub{color:var(--sub)}
+.gold{color:var(--gold)}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:right;font-weight:600;color:var(--dim);font-size:11.5px;padding:6px 8px;border-bottom:1px solid var(--border)}
+th:first-child,td:first-child{text-align:left}
+td{padding:7px 8px;border-bottom:1px solid rgba(36,48,64,.5)}
+tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--panel2)}
+
+.idx{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:760px){.idx{grid-template-columns:repeat(2,1fr)}}
+.idxbox{background:var(--panel2);border-radius:8px;padding:12px}
+.idxbox .nm{font-size:12px;color:var(--sub)}
+.idxbox .px{font-size:21px;font-weight:700;margin:4px 0;font-variant-numeric:tabular-nums}
+.idxbox .cg{font-size:13px;font-weight:600}
+.idxbox .ud{font-size:11px;color:var(--dim);margin-top:4px}
+
+.kv{display:flex;flex-wrap:wrap;gap:10px}
+.kvitem{background:var(--panel2);border-radius:8px;padding:9px 12px;min-width:110px;flex:1}
+.kvitem .k{font-size:11px;color:var(--dim)}
+.kvitem .v{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+
+.note{font-size:12px;color:var(--dim);line-height:1.75}
+.empty{padding:22px;text-align:center;color:var(--dim);font-size:13px}
+.bar{height:5px;background:var(--panel2);border-radius:3px;overflow:hidden;margin-top:5px}
+.bar>i{display:block;height:100%;background:var(--blue)}
+
+.pill{display:inline-block;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600}
+.pill.up{background:rgba(239,83,80,.14);color:var(--up);border:1px solid rgba(239,83,80,.32)}
+.pill.down{background:rgba(38,166,154,.14);color:var(--down);border:1px solid rgba(38,166,154,.32)}
+.pill.warn{background:rgba(255,208,36,.14);color:var(--gold);border:1px solid rgba(255,208,36,.32)}
+.pill.mute{background:rgba(148,163,184,.12);color:var(--sub);border:1px solid rgba(148,163,184,.28)}
+
+details{margin-top:8px}
+summary{cursor:pointer;font-size:12.5px;color:var(--sub);padding:6px 0;user-select:none}
+summary:hover{color:var(--txt)}
+
+.stockrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(36,48,64,.5)}
+.stockrow:last-child{border-bottom:none}
+.rk{width:22px;height:22px;border-radius:5px;background:var(--panel2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--sub);flex:0 0 auto}
+.rk.top{background:rgba(255,208,36,.16);color:var(--gold)}
+.snm{font-weight:600;font-size:13.5px}
+.scd{font-size:11px;color:var(--dim);margin-left:6px}
+.srt{margin-left:auto;text-align:right;font-variant-numeric:tabular-nums}
+.srt .sc{font-size:14px;font-weight:700}
+.srt .pc{font-size:11px;color:var(--dim)}
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hd">
+    <div class="brand">九宝量化 <span>v9</span></div>
+    <div class="hdmeta" id="hdMeta">数据加载中…</div>
+  </div>
+  <div class="tabs">
+    <div class="tab active" data-sec="mkt">📊 大盘</div>
+    <div class="tab" data-sec="pick">🎯 选股</div>
+  </div>
+</header>
+
+<main>
+<!-- ═══════════════ ① 大盘走势判断 ═══════════════ -->
+<section id="sec-mkt" class="active">
+  <div class="grid">
+
+    <div class="card c12">
+      <div class="ch"><h3>指数快览</h3><span class="tag">服务 ① · 大盘位置</span><span class="ts" id="ts-idx">—</span></div>
+      <div class="cb"><div class="idx" id="idxBox"><div class="empty">加载中…</div></div></div>
+    </div>
+
+    <div class="card c6">
+      <div class="ch"><h3>大盘资金</h3><span class="tag">主力净额</span><span class="ts" id="ts-mff">—</span></div>
+      <div class="cb" id="mffBox"><div class="empty">加载中…</div></div>
+    </div>
+
+    <div class="card c6">
+      <div class="ch"><h3>平均股价</h3><span class="tag">全市场位置</span><span class="ts" id="ts-avg">—</span></div>
+      <div class="cb" id="avgBox"><div class="empty">加载中…</div></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══════════════ ② 未来收益率最高的股 ═══════════════ -->
+<section id="sec-pick">
+  <div class="grid">
+
+    <div class="card c12">
+      <div class="ch"><h3>今日结论</h3><span class="tag">服务 ② · 一句话</span><span class="ts" id="ts-vd">—</span></div>
+      <div class="cb" id="vdBox"><div class="empty">加载中…</div></div>
+    </div>
+
+    <div class="card c8">
+      <div class="ch"><h3>最终推荐</h3><span class="tag" id="frTag">—</span><span class="ts" id="ts-top">—</span></div>
+      <div class="cb" id="topBox"><div class="empty">加载中…</div></div>
+    </div>
+
+    <div class="card c4">
+      <div class="ch"><h3>证据链</h3><span class="tag">同口径样本外</span><span class="ts" id="ts-evi">—</span></div>
+      <div class="cb" id="eviBox"><div class="empty">加载中…</div></div>
+    </div>
+
+  </div>
+</section>
+</main>
+
+<!-- ═══════════ 数据注入（defer，同步 workflow 维护） ═══════════ -->
+<script src="data/INDEX_QUOTES.js" defer></script>
+<script src="data/MARKET_FUND_FLOW_DATA.js" defer></script>
+<script src="data/AVG_PRICE_DATA.js" defer></script>
+<script src="data/V8_VERDICT.js" defer></script>
+<script src="data/TOP10_DAILY.js" defer></script>
+<script src="data/IMA_STRONG_BACKTEST.js" defer></script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   九宝量化 v9 渲染层
+   原则：① 大盘 / ② 选股，两页十卡。
+   降级铁律（继承 v8 血证）：
+     · 任何数据缺失 ⇒ 明示「未到位」，绝不用陈旧数据冒充当日。
+     · 榜单 validity≠ok 或 max_score<健康阈值 ⇒ 只出「候选观察」，不摆伪 Top5。
+   ══════════════════════════════════════════════════════════════ */
+(function(){
+'use strict';
+
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function num(v){ var n=Number(v); return isFinite(n)?n:null; }
+function fmt(v,d){ var n=num(v); return n==null?'—':n.toFixed(d==null?2:d); }
+function sgn(v,d){ var n=num(v); if(n==null) return '—'; return (n>0?'+':'')+n.toFixed(d==null?2:d); }
+function cls(v){ var n=num(v); if(n==null) return 'flat'; return n>0?'up':(n<0?'down':'flat'); }
+function ts(s){ return s? String(s).replace('T',' ').slice(0,16) : '—'; }
+
+/* ── 页签切换（记忆上次位置） ── */
+var tabs = document.querySelectorAll('.tab');
+function switchTo(sec){
+  for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('active', tabs[i].dataset.sec===sec);
+  document.querySelectorAll('main section').forEach(function(s){ s.classList.toggle('active', s.id==='sec-'+sec); });
+  try{ localStorage.setItem('v9_sec', sec); }catch(e){}
+  window.scrollTo(0,0);
+}
+tabs.forEach(function(t){ t.addEventListener('click', function(){ switchTo(t.dataset.sec); }); });
+
+/* ══════════════ ① 大盘 ══════════════ */
+
+function renderIndex(){
+  var D = window.INDEX_QUOTES || {};
+  var items = D.items || [];
+  var box = $('idxBox');
+  if(!items.length){ box.innerHTML='<div class="empty">指数数据未到位（data/INDEX_QUOTES.js）</div>'; return; }
+  $('ts-idx').textContent = ts(D.update_time);
+  var h='';
+  items.slice(0,4).forEach(function(x){
+    var c = cls(x.change);
+    h += '<div class="idxbox">'
+      +  '<div class="nm">'+esc(x.name||x.short)+'</div>'
+      +  '<div class="px '+c+' num">'+fmt(x.price)+'</div>'
+      +  '<div class="cg '+c+' num">'+sgn(x.change)+' ('+sgn(x.chg)+'%)</div>'
+      +  '<div class="ud">涨 '+(x.up==null?'—':x.up)+' · 跌 '+(x.down==null?'—':x.down)+'</div>'
+      +  '</div>';
+  });
+  box.innerHTML = h;
+}
+
+function renderMff(){
+  var D = window.MARKET_FUND_FLOW_DATA || {};
+  var box = $('mffBox');
+  var daily = D.daily || [];
+  if(!daily.length){ box.innerHTML='<div class="empty">资金数据未到位</div>'; return; }
+  var d = daily[daily.length-1];
+  $('ts-mff').textContent = d.date ? String(d.date).replace(/^(\d{4})(\d{2})(\d{2})$/,'$1-$2-$3') : ts(D.update_time);
+  var net = num(d.net_yi);
+  var h = '<div class="kv">'
+    + '<div class="kvitem"><div class="k">主力净额</div><div class="v '+cls(net)+'">'+sgn(net)+' 亿</div></div>'
+    + '<div class="kvitem"><div class="k">超大单</div><div class="v '+cls(d.super_large_yi)+'">'+sgn(d.super_large_yi)+' 亿</div></div>'
+    + '<div class="kvitem"><div class="k">大单</div><div class="v '+cls(d.large_yi)+'">'+sgn(d.large_yi)+' 亿</div></div>'
+    + '<div class="kvitem"><div class="k">小单</div><div class="v '+cls(d.small_yi)+'">'+sgn(d.small_yi)+' 亿</div></div>'
+    + '</div>';
+  h += '<div class="note" style="margin-top:10px">主力净额 = 超大单 + 大单。<b class="'+cls(net)+'">'
+     + (net==null?'—':(net>0?'资金净流入':'资金净流出'))
+     + '</b>，小单方向往往相反（散户对手盘）。</div>';
+  box.innerHTML = h;
+}
+
+function renderAvg(){
+  var D = window.AVG_PRICE_DATA || {};
+  var box = $('avgBox');
+  if(D.avg_price==null){ box.innerHTML='<div class="empty">平均股价未到位</div>'; return; }
+  $('ts-avg').textContent = D.date || '—';
+  var pos = num(D.position_vs_ma20);
+  var h = '<div class="kv">'
+    + '<div class="kvitem"><div class="k">平均股价</div><div class="v num">'+fmt(D.avg_price,2)+'</div></div>'
+    + '<div class="kvitem"><div class="k">当日涨跌</div><div class="v '+cls(D.avg_change_pct)+'">'+sgn(D.avg_change_pct)+'%</div></div>'
+    + '</div>';
+  h += '<div class="note" style="margin-top:10px">MA20 '+fmt(D.ma20,2)
+    + ' · 距 MA20 <b class="'+cls(pos)+'">'+sgn(pos)+'%</b>'
+    + (pos==null?'':(pos<0?'（在均线下方，弱势）':'（在均线上方，强势）'))+'</div>';
+  box.innerHTML = h;
+}
+
+/* ══════════════ ② 选股 ══════════════ */
+
+function renderVerdict(){
+  var D = window.V8_VERDICT || {};
+  var box = $('vdBox');
+  if(!D.buy && !D.position){ box.innerHTML='<div class="empty">结论未到位（data/V8_VERDICT.js）</div>'; return; }
+  $('ts-vd').textContent = ts(D.update_time);
+  var buy = D.buy || {}, pos = D.position || {};
+  var ans = buy.answer_short || buy.answer || '—';
+  var c = /买|加仓|进攻/.test(ans) ? 'up' : (/不买|空仓|防守|观察/.test(ans) ? 'down' : 'flat');
+  var h = '<div style="font-size:19px;font-weight:700;margin-bottom:8px" class="'+c+'">'+esc(ans)+'</div>';
+  if(buy.answer && buy.answer!==ans) h += '<div class="note" style="margin-bottom:8px">'+esc(buy.answer)+'</div>';
+  if(pos.label) h += '<div style="margin-bottom:6px"><span class="pill mute">仓位 '+esc(pos.label)+'</span></div>';
+  if(D.caveat) h += '<div class="note" style="margin-top:8px;border-top:1px dashed var(--border);padding-top:8px">⚠️ '+esc(D.caveat)+'</div>';
+  if(D.list_check) h += '<div class="note" style="margin-top:6px">名单校验：'+esc(typeof D.list_check==='string'?D.list_check:JSON.stringify(D.list_check))+'</div>';
+  box.innerHTML = h;
+}
+
+/* 质量闸（继承 v8 教训）：validity≠ok 或 max_score<阈值 ⇒ 不摆伪 Top5 */
+var HEALTH_MIN_SCORE = 10;
+
+function normTop10(s){
+  if(!s) return null;
+  return {
+    code: String(s.code||'').replace(/^\./,''),
+    name: s.name, board: s.board,
+    close: s.close, pct_chg: s.pct_chg,
+    score: num(s.total_score),
+    industry: s.industry,
+    sig: s.sig_count,
+    stop: s.stop_loss, target: s.target_price, rr: s.risk_reward
+  };
+}
+
+function renderTop(){
+  var TD = window.TOP10_DAILY || {};
+  var box = $('topBox'), tag = $('frTag');
+  var list = (TD.top10||[]).slice().sort(function(a,b){ return (num(b.total_score)||0)-(num(a.total_score)||0); });
+  if(!list.length){
+    box.innerHTML = '<div class="empty">📭 今日最终推荐未算出<br><span style="font-size:12px">等待盘后算法生成终选输出（TOP10_DAILY）</span></div>';
+    tag.textContent = '今日未算出'; return;
+  }
+  $('ts-top').textContent = ts(TD.update_time);
+  var v = TD.validity || {};
+  var ok = (String(v.status||'')==='ok') && (num(v.max_score)||0) >= HEALTH_MIN_SCORE;
+
+  if(!ok){
+    tag.innerHTML = '<span class="pill warn">榜单降级 · 只出候选观察</span>';
+    var head = '<div class="note" style="padding:4px 0 12px;line-height:1.85">'
+      + '<b class="gold">今日只出「候选观察」，不展示 Top5</b><br>'
+      + 'validity=' + esc(v.status||'缺失') + ' · max_score=' + (v.max_score==null?'—':esc(v.max_score))
+      + '（健康阈值 ≥'+HEALTH_MIN_SCORE+'）<br>'
+      + '原因：' + esc(v.reason||'榜单分辨度不足或状态降级')
+      + '<br>分数接近并列不等于「未来收益率最高」，故不硬排前 5。</div>';
+    box.innerHTML = head + candidateTable(list, 20, true);
+    return;
+  }
+
+  tag.innerHTML = '<span class="pill up">榜单有效</span>';
+  var top5 = list.slice(0,5).map(normTop10).filter(Boolean);
+  var h = '';
+  top5.forEach(function(s,i){
+    h += '<div class="stockrow">'
+      +  '<div class="rk '+(i===0?'top':'')+'">'+(i+1)+'</div>'
+      +  '<div><div class="snm">'+esc(s.name)+'<span class="scd">'+esc(s.code)+'</span></div>'
+      +  '<div class="scd">'+(s.industry?esc(s.industry)+' · ':'')+'止损 '+fmt(s.stop)+' / 目标 '+fmt(s.target)+'</div></div>'
+      +  '<div class="srt"><div class="sc gold num">'+fmt(s.score,1)+'</div>'
+      +  '<div class="pc '+cls(s.pct_chg)+'">'+(s.pct_chg==null?'—':sgn(s.pct_chg)+'%')+'</div></div>'
+      +  '</div>';
+  });
+  h += '<div class="note" style="margin-top:10px">口径：金股池按因子综合分降序前 5（同源同序，非收益承诺）。'
+    + ' 上游 IC 门禁与 OOS 证据见右侧「证据链」。</div>';
+  h += candidateTable(list, 20, false);
+  box.innerHTML = h;
+}
+
+function candidateTable(list, n, openDefault){
+  var rows = list.slice(0,n).map(normTop10).filter(Boolean);
+  if(!rows.length) return '';
+  var h = '<details'+(openDefault?' open':'')+'><summary>候选池（'+rows.length+' 只）— 点击展开</summary>'
+    + '<table><thead><tr><th>#</th><th>股票</th><th>行业</th><th>综合分</th><th>涨跌</th></tr></thead><tbody>';
+  rows.forEach(function(s,i){
+    h += '<tr><td class="dim num">'+(i+1)+'</td>'
+      +  '<td>'+esc(s.name)+' <span class="dim" style="font-size:11px">'+esc(s.code)+'</span></td>'
+      +  '<td class="dim" style="font-size:12px">'+esc(s.industry||'—')+'</td>'
+      +  '<td class="num gold" style="text-align:right">'+fmt(s.score,1)+'</td>'
+      +  '<td class="'+cls(s.pct_chg)+' num" style="text-align:right">'+(s.pct_chg==null?'—':sgn(s.pct_chg)+'%')+'</td></tr>';
+  });
+  h += '</tbody></table></details>';
+  return h;
+}
+
+function renderEvidence(){
+  var IM = window.IMA_STRONG_BACKTEST || {};
+  var TD = window.TOP10_DAILY || {};
+  var box = $('eviBox');
+  var o = IM.oos_segment || {};
+  var h = '';
+  $('ts-evi').textContent = ts(IM.update_time);
+
+  /* 选股榜单健康度 */
+  var v = TD.validity || {};
+  var vc = String(v.status||'')==='ok' ? 'up' : 'warn';
+  h += '<div style="margin-bottom:12px">'
+    +  '<div class="k dim" style="font-size:11px">榜单健康度</div>'
+    +  '<div style="margin-top:4px"><span class="pill '+vc+'">'+esc(v.status||'缺失')+'</span>'
+    +  ' <span class="dim" style="font-size:11.5px">max_score='+(v.max_score==null?'—':esc(v.max_score))+'</span></div>'
+    +  (v.reason?'<div class="note" style="margin-top:4px">'+esc(v.reason)+'</div>':'')
+    +  '</div>';
+
+  /* 强势跟踪 OOS（真样本外） */
+  if(o.verdict){
+    var is = (o.in_sample||{})['5'] || {}, oos = (o.out_of_sample||{})['5'] || {};
+    var bad = /^fail|insufficient/.test(String(o.verdict));
+    h += '<div style="border-top:1px dashed var(--border);padding-top:10px">'
+      +  '<div class="dim" style="font-size:11px">强势跟踪 · 样本外验证</div>'
+      +  '<div style="margin-top:5px"><span class="pill '+(bad?'warn':'up')+'">'
+      +  (bad?'未通过':'通过')+'</span> <span class="dim" style="font-size:11.5px">切点 '+esc(o.split_date||'—')+'</span></div>'
+      +  '<table style="margin-top:8px"><thead><tr><th>档</th><th>样本内</th><th>样本外</th></tr></thead><tbody>'
+      +  '<tr><td>T+5</td>'
+      +  '<td class="'+cls(is.avg_return)+' num" style="text-align:right">'+(is.n==null?'—':(is.win_rate+'% / '+sgn(is.avg_return)+'%'))+'</td>'
+      +  '<td class="'+cls(oos.avg_return)+' num" style="text-align:right">'+(oos.n==null?'—':(oos.win_rate+'% / '+sgn(oos.avg_return)+'%'))+'</td></tr>'
+      +  '</tbody></table>'
+      +  '<div class="note" style="margin-top:8px">'+esc(o.verdict)+'</div>'
+      +  '</div>';
+  } else {
+    h += '<div class="note" style="border-top:1px dashed var(--border);padding-top:10px">'
+      +  '强势跟踪 OOS 分段未产出（等待回测链重跑）。</div>';
+  }
+  box.innerHTML = h;
+}
+
+/* ══════════════ 主渲染 + 自愈轮询 ══════════════ */
+var RENDERS = [
+  ['IDX', renderIndex], ['MFF', renderMff], ['AVG', renderAvg],
+  ['VD', renderVerdict], ['TOP', renderTop], ['EVI', renderEvidence]
+];
+
+function renderAll(){
+  RENDERS.forEach(function(r){ try{ r[1](); }catch(e){ console.warn('[v9]', r[0], e); } });
+  var TD = window.TOP10_DAILY || {};
+  $('hdMeta').textContent = TD.update_time ? ('榜单 '+ts(TD.update_time)) : '数据加载中…';
+}
+
+function boot(){
+  var s=null; try{ s=localStorage.getItem('v9_sec'); }catch(e){}
+  if(s && document.getElementById('sec-'+s)) switchTo(s);
+  renderAll();
+  /* 自愈：defer 脚本可能晚于首次渲染，600ms×20 内补渲 */
+  var n=0, timer=setInterval(function(){
+    n++;
+    var any = (window.INDEX_QUOTES||window.TOP10_DAILY||window.V8_VERDICT);
+    if(any){ clearInterval(timer); renderAll(); }
+    else if(n>20){ clearInterval(timer); }
+  }, 600);
+}
+
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+
+/* 暴露给外部调试 */
+window.v9 = { renderAll: renderAll, switchTo: switchTo };
+})();
+</script>
+</body>
+</html>
