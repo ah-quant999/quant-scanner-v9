@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 10
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment2.outputs.page_url || steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,4 +45,18 @@ jobs:
         with:
           path: '.'
       - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      # GitHub Pages 对同一站点有最短部署间隔（约 1 分钟）。连推两个 commit 时，
+      # 第二次会撞锁报 "Deployment failed, try again later" —— 表现为一个红叉假失败，
+      # 而线上其实是对的（部署的是前一次成功的产物）。等 60 秒重来一次，别让它冒充故障。
+      - name: 撞 Pages 部署节流 → 等 60 秒重试
+        if: steps.deployment.outcome == 'failure'
+        run: |
+          echo "⚠️ 首次部署失败，疑似 Pages 最短间隔节流，等待 60 秒后重试"
+          sleep 60
+
+      - id: deployment2
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
